@@ -88,7 +88,7 @@ st.markdown(
 max_points = st.number_input(
     "Maksymalna liczba punktów",
     min_value=1.0,
-    value=25.0
+    value=
 )
 
 thresholds = build_thresholds(max_points)
