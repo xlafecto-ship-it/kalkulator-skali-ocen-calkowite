@@ -116,8 +116,8 @@ parsed = parse_points_expression(expr)
 if parsed is not None:
     if parsed > max_points:
         st.warning(
-            f"Suma punktów ({parsed:g}) przekracza maksymalną liczbę punktów "
-            f"({max_points:g}). Do obliczeń przyjęto {max_points:g}."
+            f"Suma punktów przekracza maksymalną liczbę punktów! "
+           
         )
         shown_sum = max_points
     else:
