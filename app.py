@@ -6,27 +6,18 @@ import re
 # ============================
 # Helpers: half-point grid (0.5)
 # ============================
-def round_down_to_half(value: float) -> float:
-    return math.floor(value * 2) / 2
-
 def round_up_to_half(value: float) -> float:
     return math.ceil(value * 2) / 2
 
 # ============================
-# Teacher input parser (comma decimals)
+# Teacher input parser
 # ============================
 def parse_points_expression(expr: str) -> float | None:
-    """
-    Parsuje np. '3+5+2,5+0,5'
-    Przecinek = separator dziesiętny
-    """
     if not expr:
         return None
-
     expr = expr.replace(" ", "")
     if not re.fullmatch(r"[0-9+,]+", expr):
         return None
-
     try:
         return sum(float(p.replace(",", ".")) for p in expr.split("+") if p)
     except ValueError:
@@ -34,78 +25,42 @@ def parse_points_expression(expr: str) -> float | None:
 
 # ============================
 # STAŁA SKALA 1–6 (bez +/-)
-# (zmergowane zakresy z Twojej starej skali)
-# 1: 0–29, 2: 30–45, 3: 46–69, 4: 70–84, 5: 85–95, 6: 96–100
 # ============================
 SCALE_SIMPLE = [
-    ("1", 0, 29),
-    ("2", 30, 45),
-    ("3", 46, 69),
-    ("4", 70, 84),
-    ("5", 85, 95),
-    ("6", 96, 100),
+    ("1", 0, 27),
+    ("2", 28, 47),
+    ("3", 48, 67),
+    ("4", 68, 82),
+    ("5", 83, 93),
+    ("6", 94, 100),
 ]
 
 # ============================
-# Build POINT thresholds (half-first)
+# Thresholds (half grid)
 # ============================
-def build_thresholds_point_first(max_points: float):
-    raw = []
+def build_thresholds(max_points: float):
+    thresholds = []
     for grade, p_min, p_max in SCALE_SIMPLE:
-        start_pts = round_up_to_half(max_points * (p_min / 100))
-        end_pts   = round_down_to_half(max_points * (p_max / 100))
-        raw.append((grade, start_pts, end_pts, p_min, p_max))
+        start = math.ceil(max_points * p_min / 100 * 2) / 2
+        end = math.floor(max_points * p_max / 100 * 2) / 2
+        thresholds.append((grade, start, end, p_min, p_max))
+    return thresholds
 
-    raw.sort(key=lambda x: x[1])
-
-    fixed = []
-    last_end = None
-
-    for grade, start_pts, end_pts, p_min, p_max in raw:
-        if start_pts > end_pts:
-            continue
-
-        # usuwanie nakładek: pilnujemy kroków co 0.5
-        if last_end is not None and start_pts <= last_end:
-            start_pts = round_up_to_half(last_end + 0.5)
-
-        if start_pts > end_pts:
-            continue
-
-        fixed.append((grade, start_pts, end_pts, p_min, p_max))
-        last_end = end_pts
-
-    return fixed
-
-def grade_for_points(earned_pts_h: float, thresholds):
-    if not thresholds:
-        return "N/A"
-
-    for grade, start_pts, end_pts, *_ in thresholds:
-        if start_pts <= earned_pts_h <= end_pts:
+def grade_for_points(points: float, thresholds):
+    for grade, start, end, *_ in thresholds:
+        if start <= points <= end:
             return grade
-
-    # poniżej pierwszego progu -> najniższa ocena
-    if earned_pts_h < thresholds[0][1]:
-        return thresholds[0][0]
-
-    # powyżej ostatniego -> najwyższa
     return thresholds[-1][0]
 
-# ============================
-# Percent formatting (no trailing .00)
-# ============================
-def percent_info_str(earned_pts_h: float, max_points: float) -> str:
-    if not max_points:
-        return "0%"
-    return f"{(earned_pts_h / max_points) * 100:g}%"
+def percent_str(points: float, max_points: float) -> str:
+    return f"{(points / max_points) * 100:g}%"
 
 # ============================
 # UI
 # ============================
 st.title("Kalkulator ocen")
 
-# Wycentruj tytuł
+# ⚠️ CSS – MUSI mieć unsafe_allow_html=True
 st.markdown(
     """
     <style>
@@ -118,7 +73,6 @@ st.markdown(
         height: 70px;
         border-radius: 0.6rem;
         font-weight: 600;
-        text-align: center;
         color: white;
         margin-top: 0.25rem;
     }
@@ -135,106 +89,75 @@ st.markdown(
 max_points = st.number_input(
     "Maksymalna liczba punktów",
     min_value=1.0,
-    step=1.0,
-    value=25.0,
+    value=25.0
 )
 
-thresholds = build_thresholds_point_first(max_points)
+thresholds = build_thresholds(max_points)
 
 st.subheader("Sprawdź wynik")
 
-# lista możliwych punktów co 0.5
 possible_points = [x / 2 for x in range(0, int(max_points * 2) + 1)]
 
-col1, col2 = st.columns(2)
+c1, c2 = st.columns(2)
 
-with col1:
-    earned_select = st.selectbox("Zdobyte punkty", possible_points)
+with c1:
+    manual_points = st.selectbox("Zdobyte punkty", possible_points)
 
-with col2:
-    expr_input = st.text_input("Suma punktów (np. 2+1,5+0,5)")
+with c2:
+    expr = st.text_input("Suma punktów (np. 2+1,5+0,5)")
 
-parsed_sum = parse_points_expression(expr_input)
+parsed = parse_points_expression(expr)
 
-# ---- SUMA (box) ----
-if parsed_sum is not None:
+# ---- SUMA ----
+if parsed is not None:
     st.markdown(
         f"""
         <div class="result-box box-sum">
-            Suma punktów: {parsed_sum:g} / {max_points:g}
+            Suma punktów: {parsed:g} / {max_points:g}
         </div>
         """,
         unsafe_allow_html=True
     )
-    earned_raw = min(parsed_sum, max_points)
+    raw_points = min(parsed, max_points)
 else:
-    earned_raw = float(earned_select)
+    raw_points = manual_points
 
-# ✅ ZAOKRĄGLANIE NA KORZYŚĆ UCZNIA: zawsze w górę do 0.5
-earned_h = round_up_to_half(earned_raw)
+# ✅ zaokrąglanie w górę (na korzyść ucznia)
+points_half = round_up_to_half(raw_points)
 
-found_grade = grade_for_points(earned_h, thresholds)
-percent_str = percent_info_str(earned_h, max_points)
+grade = grade_for_points(points_half, thresholds)
+percent = percent_str(points_half, max_points)
 
-# ---- WYNIK: ocena | procent ----
-res_col1, res_col2 = st.columns(2)
+# ---- WYNIK ----
+r1, r2 = st.columns(2)
 
-with res_col1:
-    grade_class = "box-grade-fail" if found_grade == "1" else "box-grade"
+with r1:
+    cls = "box-grade-fail" if grade == "1" else "box-grade"
     st.markdown(
-        f"""
-        <div class="result-box {grade_class}">
-            Ocena: {found_grade}
-        </div>
-        """,
+        f"<div class='result-box {cls}'>Ocena: {grade}</div>",
         unsafe_allow_html=True
     )
 
-with res_col2:
+with r2:
     st.markdown(
-        f"""
-        <div class="result-box box-percent">
-            Procent: {percent_str}
-        </div>
-        """,
+        f"<div class='result-box box-percent'>Procent: {percent}</div>",
         unsafe_allow_html=True
     )
 
-st.caption(f"Punkty (połówki, zaokr. w górę): {earned_h:g} / {max_points:g}")
+st.caption(f"Punkty (połówki, zaokr. w górę): {points_half:g} / {max_points:g}")
 
-# ---- Skala ocen (wycentrowany nagłówek) ----
+# ---- SKALA ----
 st.markdown("<h2 style='text-align: center;'>Skala ocen</h2>", unsafe_allow_html=True)
 
-rows = []
-for grade, start_pts, end_pts, p_min, p_max in thresholds:
-    rows.append({
-        "Punkty od": f"{start_pts:g}",
-        "Punkty do": f"{end_pts:g}",
-        "Ocena": grade,
-        "Procent (źródło)": f"{p_min}–{p_max}%",
-    })
+df = pd.DataFrame([
+    {
+        "Ocena": g,
+        "Punkty od": f"{s:g}",
+        "Punkty do": f"{e:g}",
+        "Procent": f"{p1}–{p2}%"
+    }
+    for g, s, e, p1, p2 in thresholds
+])
 
-df = pd.DataFrame(rows)
 df.index = [""] * len(df)
 st.table(df)
-
-# ---- Diagnostyka (opcjonalnie) ----
-with st.expander("Diagnostyka (opcjonalnie)"):
-    if not thresholds:
-        st.warning("Brak poprawnych progów (sprawdź max_points).")
-    else:
-        gaps = []
-        for i in range(len(thresholds) - 1):
-            _, _, end_i, *_ = thresholds[i]
-            _, start_j, _, *_ = thresholds[i + 1]
-            if start_j > end_i + 0.5:
-                gaps.append((end_i + 0.5, start_j - 0.5))
-
-        if gaps:
-            st.warning("Wykryto luki (połówki, które nie należą do żadnej oceny):")
-            st.write(gaps)
-        else:
-            st.success("Brak luk między progami na siatce 0.5.")
-
-        st.write(f"Najniższy próg zaczyna się od: {thresholds[0][1]:g}")
-        st.write(f"Najwyższy próg kończy się na: {thresholds[-1][2]:g}")
