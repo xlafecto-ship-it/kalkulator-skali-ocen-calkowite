@@ -99,8 +99,6 @@ if max_points is None:
 
 thresholds = build_thresholds(max_points)
 
-st.subheader("Sprawdź wynik")
-
 possible_points = [x / 2 for x in range(0, int(max_points * 2) + 1)]
 
 c1, c2 = st.columns(2)
