@@ -92,6 +92,11 @@ max_points = st.number_input(
     placeholder="np. 25"
 )
 
+if max_points is None:
+    st.info("Wpisz maksymalną liczbę punktów, aby kontynuować.")
+    st.stop()
+
+
 thresholds = build_thresholds(max_points)
 
 st.subheader("Sprawdź wynik")
