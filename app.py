@@ -88,6 +88,7 @@ st.markdown(
 max_points = st.number_input(
     "Maksymalna liczba punktów",
     min_value=1.0,
+    max_value=500.0,
     value=None,
     placeholder="np. 25"
 )
