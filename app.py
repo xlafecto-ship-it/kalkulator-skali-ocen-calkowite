@@ -114,15 +114,25 @@ parsed = parse_points_expression(expr)
 
 # ---- SUMA ----
 if parsed is not None:
+    if parsed > max_points:
+        st.warning(
+            f"Suma punktów ({parsed:g}) przekracza maksymalną liczbę punktów "
+            f"({max_points:g}). Do obliczeń przyjęto {max_points:g}."
+        )
+        shown_sum = max_points
+    else:
+        shown_sum = parsed
+
     st.markdown(
         f"""
         <div class="result-box box-sum">
-            Suma punktów: {parsed:g} / {max_points:g}
+            Suma punktów: {shown_sum:g} / {max_points:g}
         </div>
         """,
         unsafe_allow_html=True
     )
-    raw_points = min(parsed, max_points)
+
+    raw_points = shown_sum
 else:
     raw_points = manual_points
 
