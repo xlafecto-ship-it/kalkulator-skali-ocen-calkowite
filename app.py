@@ -27,12 +27,12 @@ def parse_points_expression(expr: str) -> float | None:
 # STAŁA SKALA 1–6 (bez +/-)
 # ============================
 SCALE_SIMPLE = [
-    ("1", 0, 27),
-    ("2", 28, 47),
-    ("3", 48, 67),
-    ("4", 68, 82),
-    ("5", 83, 93),
-    ("6", 94, 100),
+    ("1", 0, 29),
+    ("2", 30, 45),
+    ("3", 46, 69),
+    ("4", 70, 84),
+    ("5", 85, 95),
+    ("6", 96, 100),
 ]
 
 # ============================
@@ -60,7 +60,6 @@ def percent_str(points: float, max_points: float) -> str:
 # ============================
 st.title("Kalkulator ocen")
 
-# ⚠️ CSS – MUSI mieć unsafe_allow_html=True
 st.markdown(
     """
     <style>
