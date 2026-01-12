@@ -147,8 +147,6 @@ with r2:
         unsafe_allow_html=True
     )
 
-st.caption(f"Punkty (połówki, zaokr. w górę): {points_half:g} / {max_points:g}")
-
 # ---- SKALA ----
 st.markdown("<h2 style='text-align: center;'>Skala ocen</h2>", unsafe_allow_html=True)
 
