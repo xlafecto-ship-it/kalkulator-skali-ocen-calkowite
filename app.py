@@ -21,15 +21,15 @@ def parse_points_expression(expr: str) -> float | None:
         return None
 
 # ============================
-# STAŁA SKALA 1–6
+# STAŁA SKALA 1–6 (bez +/-)
 # ============================
 SCALE_SIMPLE = [
-    ("1", 0, 27),
-    ("2", 28, 47),
-    ("3", 48, 67),
-    ("4", 68, 82),
-    ("5", 83, 93),
-    ("6", 94, 100),
+    ("1", 0, 29),
+    ("2", 30, 45),
+    ("3", 46, 69),
+    ("4", 70, 84),
+    ("5", 85, 95),
+    ("6", 96, 100),
 ]
 
 def build_thresholds(max_points: float):
@@ -44,9 +44,12 @@ def grade_for_points(points: float, thresholds):
     for grade, start, end, *_ in thresholds:
         if start <= points <= end:
             return grade
+    if points < thresholds[0][1]:
+        return thresholds[0][0]
     return thresholds[-1][0]
 
 def percent_str(points: float, max_points: float) -> str:
+    # procent bez miejsc po przecinku
     return f"{int(round((points / max_points) * 100))}%"
 
 # ============================
@@ -86,7 +89,8 @@ max_points = st.number_input(
     min_value=1.0,
     max_value=500.0,
     value=None,
-    placeholder="np. 25"
+    placeholder="np. 25",
+    key="max_points"
 )
 
 if max_points is None:
@@ -97,57 +101,74 @@ thresholds = build_thresholds(max_points)
 
 st.subheader("Sprawdź wynik")
 
-c1, c2 = st.columns(2)
+# ✅ Przełącznik źródła — to rozwiązuje problem “nie działa”
+mode = st.radio(
+    "Źródło punktów",
+    ["Zdobyte punkty (ręcznie)", "Suma punktów"],
+    horizontal=True
+)
 
-# ---------- MANUAL POINTS ----------
-with c1:
+# ---------- INPUTS ----------
+if mode == "Zdobyte punkty (ręcznie)":
     manual_points = st.number_input(
         "Zdobyte punkty",
         min_value=0.0,
         max_value=float(max_points),
         value=0.0,
-        step=0.5
+        step=0.5,
+        key="manual_points"
+    )
+    raw_points = manual_points
+
+else:
+    # ✅ „telefoniczne” jak max_points
+    sum_points = st.number_input(
+        "Suma punktów",
+        min_value=0.0,
+        max_value=float(max_points) * 10,  # pozwala wpisać więcej, a my i tak ucinamy
+        value=0.0,
+        step=0.5,
+        key="sum_points"
     )
 
-# ---------- SUM EXPRESSION ----------
-with c2:
-    expr = st.text_input("Suma punktów (np. 2+1,5+0,5)")
+    # opcjonalnie: działanie typu 2+1,5+0,5 (nie miesza się z ręcznym trybem)
+    with st.expander("Albo wpisz działanie (opcjonalnie)"):
+        expr = st.text_input("Działanie (np. 2+1,5+0,5)", key="expr")
+        expr_clean = expr.strip()
+        parsed = parse_points_expression(expr_clean) if expr_clean else None
 
-expr_clean = expr.strip()
-parsed = parse_points_expression(expr_clean) if expr_clean else None
+        if expr_clean and parsed is None:
+            st.error("Błędny zapis. Użyj tylko cyfr, + i przecinków (np. 2+1,5+0,5).")
+        elif parsed is not None:
+            sum_points = parsed  # jeśli poprawne działanie — nadpisuje liczbę
 
-if expr_clean and parsed is None:
-    st.error("Błędny zapis sumy punktów. Użyj np. 2+1,5+0,5.")
-
-# ---------- SOURCE OF POINTS ----------
-if parsed is not None:
-    if parsed > max_points:
+    # zabezpieczenie > max_points
+    if sum_points > max_points:
         st.warning(
-            f"Suma punktów ({parsed:g}) przekracza maksymalną liczbę punktów "
+            f"Suma punktów ({sum_points:g}) przekracza maksymalną liczbę punktów "
             f"({max_points:g}). Do obliczeń przyjęto {max_points:g}."
         )
-        raw_points = max_points
+        sum_points_used = max_points
     else:
-        raw_points = parsed
+        sum_points_used = sum_points
 
     st.markdown(
         f"""
         <div class="result-box box-sum">
-            Suma punktów: {raw_points:g} / {max_points:g}
+            Suma punktów: {sum_points_used:g} / {max_points:g}
         </div>
         """,
         unsafe_allow_html=True
     )
-else:
-    raw_points = manual_points
 
-# ---------- ROUNDING ----------
+    raw_points = sum_points_used
+
+# ---------- ROUNDING + RESULT ----------
 points_half = round_up_to_half(raw_points)
 
 grade = grade_for_points(points_half, thresholds)
 percent = percent_str(points_half, max_points)
 
-# ---------- RESULT ----------
 r1, r2 = st.columns(2)
 
 with r1:
