@@ -4,14 +4,11 @@ import pandas as pd
 import re
 
 # ============================
-# Helpers: half-point grid (0.5)
+# Helpers
 # ============================
 def round_up_to_half(value: float) -> float:
     return math.ceil(value * 2) / 2
 
-# ============================
-# Teacher input parser (comma decimals)
-# ============================
 def parse_points_expression(expr: str) -> float | None:
     if not expr:
         return None
@@ -24,7 +21,7 @@ def parse_points_expression(expr: str) -> float | None:
         return None
 
 # ============================
-# STAŁA SKALA 1–6 (bez +/-)
+# STAŁA SKALA 1–6
 # ============================
 SCALE_SIMPLE = [
     ("1", 0, 29),
@@ -35,9 +32,6 @@ SCALE_SIMPLE = [
     ("6", 96, 100),
 ]
 
-# ============================
-# Thresholds (half grid)
-# ============================
 def build_thresholds(max_points: float):
     thresholds = []
     for grade, p_min, p_max in SCALE_SIMPLE:
@@ -50,16 +44,10 @@ def grade_for_points(points: float, thresholds):
     for grade, start, end, *_ in thresholds:
         if start <= points <= end:
             return grade
-    if points < thresholds[0][1]:
-        return thresholds[0][0]
     return thresholds[-1][0]
 
-# ✅ PROCENT BEZ MIEJSC PO PRZECINKU
 def percent_str(points: float, max_points: float) -> str:
-    if not max_points:
-        return "0%"
-    pct = (points / max_points) * 100
-    return f"{int(round(pct))}%"
+    return f"{int(round((points / max_points) * 100))}%"
 
 # ============================
 # UI
@@ -92,7 +80,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# max_points "puste" + limit żeby nie zabić apki
+# ---------- MAX POINTS ----------
 max_points = st.number_input(
     "Maksymalna liczba punktów",
     min_value=1.0,
@@ -111,7 +99,7 @@ st.subheader("Sprawdź wynik")
 
 c1, c2 = st.columns(2)
 
-# ✅ “telefoniczny” input punktów (połówki)
+# ---------- MANUAL POINTS ----------
 with c1:
     manual_points = st.number_input(
         "Zdobyte punkty",
@@ -121,42 +109,45 @@ with c1:
         step=0.5
     )
 
+# ---------- SUM EXPRESSION ----------
 with c2:
     expr = st.text_input("Suma punktów (np. 2+1,5+0,5)")
 
-parsed = parse_points_expression(expr)
+expr_clean = expr.strip()
+parsed = parse_points_expression(expr_clean) if expr_clean else None
 
-# ---- SUMA (z zabezpieczeniem > max_points) ----
+if expr_clean and parsed is None:
+    st.error("Błędny zapis sumy punktów. Użyj np. 2+1,5+0,5.")
+
+# ---------- SOURCE OF POINTS ----------
 if parsed is not None:
     if parsed > max_points:
         st.warning(
             f"Suma punktów ({parsed:g}) przekracza maksymalną liczbę punktów "
             f"({max_points:g}). Do obliczeń przyjęto {max_points:g}."
         )
-        shown_sum = max_points
+        raw_points = max_points
     else:
-        shown_sum = parsed
+        raw_points = parsed
 
     st.markdown(
         f"""
         <div class="result-box box-sum">
-            Suma punktów: {shown_sum:g} / {max_points:g}
+            Suma punktów: {raw_points:g} / {max_points:g}
         </div>
         """,
         unsafe_allow_html=True
     )
-
-    raw_points = shown_sum
 else:
     raw_points = manual_points
 
-# ✅ zaokrąglanie w górę do 0.5 (na korzyść ucznia)
+# ---------- ROUNDING ----------
 points_half = round_up_to_half(raw_points)
 
 grade = grade_for_points(points_half, thresholds)
 percent = percent_str(points_half, max_points)
 
-# ---- WYNIK ----
+# ---------- RESULT ----------
 r1, r2 = st.columns(2)
 
 with r1:
@@ -174,7 +165,7 @@ with r2:
 
 st.caption(f"Punkty (połówki, zaokr. w górę): {points_half:g} / {max_points:g}")
 
-# ---- SKALA ----
+# ---------- SCALE ----------
 st.markdown("<h2 style='text-align: center;'>Skala ocen</h2>", unsafe_allow_html=True)
 
 df = pd.DataFrame([
