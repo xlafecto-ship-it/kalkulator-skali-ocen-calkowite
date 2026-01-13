@@ -10,7 +10,7 @@ def round_up_to_half(value: float) -> float:
     return math.ceil(value * 2) / 2
 
 # ============================
-# Teacher input parser
+# Teacher input parser (comma decimals)
 # ============================
 def parse_points_expression(expr: str) -> float | None:
     if not expr:
@@ -42,7 +42,7 @@ def build_thresholds(max_points: float):
     thresholds = []
     for grade, p_min, p_max in SCALE_SIMPLE:
         start = math.ceil(max_points * p_min / 100 * 2) / 2
-        end = math.floor(max_points * p_max / 100 * 2) / 2
+        end   = math.floor(max_points * p_max / 100 * 2) / 2
         thresholds.append((grade, start, end, p_min, p_max))
     return thresholds
 
@@ -50,10 +50,16 @@ def grade_for_points(points: float, thresholds):
     for grade, start, end, *_ in thresholds:
         if start <= points <= end:
             return grade
+    if points < thresholds[0][1]:
+        return thresholds[0][0]
     return thresholds[-1][0]
 
+# ✅ PROCENT BEZ MIEJSC PO PRZECINKU
 def percent_str(points: float, max_points: float) -> str:
-    return f"{(points / max_points) * 100:g}%"
+    if not max_points:
+        return "0%"
+    pct = (points / max_points) * 100
+    return f"{int(round(pct))}%"
 
 # ============================
 # UI
@@ -74,6 +80,7 @@ st.markdown(
         font-weight: 600;
         color: white;
         margin-top: 0.25rem;
+        text-align: center;
     }
 
     .box-sum { background-color: #1f4b6e; }
@@ -85,6 +92,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# max_points "puste" + limit żeby nie zabić apki
 max_points = st.number_input(
     "Maksymalna liczba punktów",
     min_value=1.0,
@@ -97,27 +105,33 @@ if max_points is None:
     st.info("Wpisz maksymalną liczbę punktów, aby kontynuować.")
     st.stop()
 
-
 thresholds = build_thresholds(max_points)
 
-possible_points = [x / 2 for x in range(0, int(max_points * 2) + 1)]
+st.subheader("Sprawdź wynik")
 
 c1, c2 = st.columns(2)
 
+# ✅ “telefoniczny” input punktów (połówki)
 with c1:
-    manual_points = st.selectbox("Zdobyte punkty", possible_points)
+    manual_points = st.number_input(
+        "Zdobyte punkty",
+        min_value=0.0,
+        max_value=float(max_points),
+        value=0.0,
+        step=0.5
+    )
 
 with c2:
     expr = st.text_input("Suma punktów (np. 2+1,5+0,5)")
 
 parsed = parse_points_expression(expr)
 
-# ---- SUMA ----
+# ---- SUMA (z zabezpieczeniem > max_points) ----
 if parsed is not None:
     if parsed > max_points:
         st.warning(
-            f"Suma punktów przekracza maksymalną liczbę punktów! "
-           
+            f"Suma punktów ({parsed:g}) przekracza maksymalną liczbę punktów "
+            f"({max_points:g}). Do obliczeń przyjęto {max_points:g}."
         )
         shown_sum = max_points
     else:
@@ -136,7 +150,7 @@ if parsed is not None:
 else:
     raw_points = manual_points
 
-# ✅ zaokrąglanie w górę (na korzyść ucznia)
+# ✅ zaokrąglanie w górę do 0.5 (na korzyść ucznia)
 points_half = round_up_to_half(raw_points)
 
 grade = grade_for_points(points_half, thresholds)
@@ -157,6 +171,8 @@ with r2:
         f"<div class='result-box box-percent'>Procent: {percent}</div>",
         unsafe_allow_html=True
     )
+
+st.caption(f"Punkty (połówki, zaokr. w górę): {points_half:g} / {max_points:g}")
 
 # ---- SKALA ----
 st.markdown("<h2 style='text-align: center;'>Skala ocen</h2>", unsafe_allow_html=True)
